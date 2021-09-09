@@ -16,6 +16,7 @@ module.exports = (sequelize, DataTypes) => {
       this.hasMany(Wallet,{foreignKey:"userId"})
       this.hasMany(Beneficiary,{foreignKey:"beneficiaryId"})
       this.hasMany(Beneficiary,{foreignKey:"benefactorId"})
+      this.hasMany(Beneficiary,{foreignKey:"userId"})
     }
   };
   User.init({

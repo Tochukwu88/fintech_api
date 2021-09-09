@@ -1,109 +1,225 @@
- 
- const { User , Wallet,Transaction} = require('../models/index')
- class Wallets{
-    static async createWallet (userid){
-        const user = await User.findOne({where:{id:userid}})
-        if (user) {
-            const wallet = await Wallet.findOne({ where: { userId: user.dataValues.id } })
 
+const db = require('../models/index');
+const { User, Wallet, Transaction, BankDetails,Beneficiary } = require('../models/index');
+const Paystack = require('../utils/paystack');
+const { internalResponse } = require('../utils/responseHandler');
+
+class Wallets {
+    static async createWallet(userid) {
+        let transaction
+        try {
+            transaction = await db.sequelize.transaction()
+            const user = await User.findOne({ where: { id: userid } }, { transaction })
+            if (user) {
+                const wallet = await Wallet.findOne({ where: { userId: user.dataValues.id } }, { transaction })
+
+                if (!wallet) {
+
+                    await Wallet.create({ userId: user.dataValues.id, balance: 0.00 }, { transaction })
+
+                }
+            }
+            await transaction.commit()
+
+        } catch (error) {
+            await transaction.rollbaack()
+        }
+
+
+    }
+    static async creditWallet(id, amount, description) {
+        let transaction
+        try {
+            transaction = await db.sequelize.transaction()
+            if (amount < 0.00) {
+                return internalResponse(false, "", 400, "amount must be greater than 0.00")
+            }
+            const wallet = await Wallet.findOne({ where: { id } }, { transaction })
             if (!wallet) {
+                return internalResponse(false, "", 404, "wallet not found")
 
-                await Wallet.create({  userId: user.dataValues.id, balance: 0.00 })
-               
             }
-        }
-        
+            const updatedwallet = await wallet.increment('balance', {
+                by: amount
+            }, { transaction })
+            const updatedbalance = await Wallet.findOne({ where: { id: updatedwallet.dataValues.id } }, { transaction })
 
-    }
-    static async creditWallet (id,amount,description){
-      try{
-        if(amount < 0.00){
-            throw new Error("amount must be greater than 0.00")
+            await Transaction.create({
+                amount,
+                transactionType: "credit",
+                walletId: id,
+                currentBalance: updatedbalance.dataValues.balance,
+                description
+
+
+            }, { transaction })
+            await transaction.commit()
+            return internalResponse(true, "", 200, "wallet credited")
+
+
+        } catch (error) {
+            await transaction.rollbaack()
+            throw new Error("transaction failed")
         }
-        const wallet = await Wallet.findOne({ where: { id } })
-        if(!wallet) {
-            throw new Error("wallet not found")
-        }
-        wallet.increment({
-            balance:+amount
-        })
-        await Transaction.create({
-            amount,
-            transactionType:"credit",
-            walletId:id,
-            currentBalance:wallet.balance,
-            description
-          
-        
-        })
-      }catch(error){
-          throw new Error("transaction failed")
-      }
 
 
     }
-    static async debitWallet (id,amount,description){
-      try{
-        if(amount < 0.00){
-            throw new Error("amount must be greater than 0.00")
-        }
-        const wallet = await Wallet.findOne({ where: { id } })
-        if(!wallet) {
-            throw new Error("wallet not found")
-        }
-        if(wallet.balance < amount){
-            throw new Error("insufficient funds")
-        }
-        wallet.decrement({
-            balance:-amount
-        })
-        await Transaction.create({
-            amount,
-            transactionType:"debit",
-            walletId:id,
-            currentBalance:wallet.balance,
-            description
-          
-        
-        })
-
-
-      }catch(error){
-          throw new Error('transaction failed')
-      }
-    }
-    static async transfer(id,email,amount,description){
-        try{
-            const user = await User.findOne({where:{id}})
-        const beneficiary = await User.findOne({where:{email}})
-        let userWallet
-        let beneficiaryWallet;
-        if (user) {
-            userWallet = await Wallet.findOne({ where: { userId: user.dataValues.id } })
-
-            if (!userWallet) {
-
-                throw new Error('user does not have a wallet')
-               
+    static async debitWallet(id, amount, description) {
+        let transaction
+        try {
+            transaction = await db.sequelize.transaction()
+            if (amount < 0.00) {
+                return internalResponse(false, "", 400, "amount must be greater than 0.00")
             }
-        }
-        if(beneficiary){
-            beneficiaryWallet = await Wallet.findOne({ where: { userId: beneficiary.dataValues.id } })
-
-            if (!beneficiaryWallet) {
-
-                throw new Error('beneciciary does not have a wallet')
-               
+            const wallet = await Wallet.findOne({ where: { id } }, { transaction })
+            if (!wallet) {
+                return internalResponse(false, "", 404, "wallet not found")
             }
-        }
-        await   this.debitWallet(userWallet.dataValues.id, amount,description)
-         await  this.creditWallet(beneficiaryWallet.dataValues.id,amount,description)
+            if (wallet.dataValues.balance < amount) {
+                return internalResponse(false, "", 400, "insufficient funds")
+            }
+            const updatedwallet = await wallet.decrement('balance', {
+                by: amount
+            }, { transaction })
+            const updatedbalance = await Wallet.findOne({ where: { id: updatedwallet.dataValues.id } }, { transaction })
 
-        }catch(error){
+            await Transaction.create({
+                amount,
+                transactionType: "debit",
+                walletId: id,
+                currentBalance: updatedbalance.dataValues.balance,
+                description
+
+
+            }, { transaction })
+            await transaction.commit()
+            return internalResponse(true, "", 200, "transaction succesfull")
+
+
+        } catch (error) {
+            await transaction.rollbaack()
+            console.log(error)
             throw new Error('transaction failed')
         }
     }
-       
+    static async transfer(id, email, amount, description) {
+        //transfer to any registered user with their email
+        let transaction
+        try {
+            transaction = await db.sequelize.transaction()
+            const user = await User.findOne({ where: { id } }, { transaction })
+            const beneficiary = await User.findOne({ where: { email } }, { transaction })
+            let userWallet
+            let beneficiaryWallet;
+            if (user) {
+                userWallet = await Wallet.findOne({ where: { userId: user.dataValues.id } }, { transaction })
 
- }
- module.exports =  Wallets
+                if (!userWallet) {
+                    return internalResponse(false, "", 404, "user does not have a wallet")
+
+
+
+                }
+            }
+            if (beneficiary) {
+                beneficiaryWallet = await Wallet.findOne({ where: { userId: beneficiary.dataValues.id } }, { transaction })
+
+                if (!beneficiaryWallet) {
+                    return internalResponse(false, "", 404, "beneciciary does not have a wallet")
+
+
+
+                }
+            }
+            const dresponse = await this.debitWallet(userWallet.dataValues.id, amount, description)
+            if (!dresponse.status) return dresponse
+            const cresponse = await this.creditWallet(beneficiaryWallet.dataValues.id, amount, description)
+            if (!cresponse.status) return cresponse
+            await transaction.commit()
+            return internalResponse(true, "", 200, "transaction successful")
+
+
+        } catch (error) {
+            console.log(error)
+            await transaction.rollbaack()
+            throw new Error('transaction failed')
+        }
+    }
+    static async withdraw(amount, id) {
+        //withdraw from user's wallet to user's bank using paystack
+        let transaction
+        try {
+            transaction = await db.sequelize.transaction()
+            const user = await User.findOne({ where: { id } }, { transaction })
+            let userWallet
+            let userBankDetails
+            if (user) {
+                userWallet = await Wallet.findOne({ where: { userId: user.dataValues.id } }, { transaction })
+
+                if (!userWallet) {
+                    return internalResponse(false, "", 404, "user does not have a wallet")
+
+
+
+                }
+                userBankDetails = await BankDetails.findOne({ where: { userId: user.dataValues.id } }, { transaction })
+                if (!userBankDetails) return internalResponse(false, "", 404, "no bank details")
+            }
+            const dresponse = await this.debitWallet(userWallet.dataValues.id, amount)
+
+            const result = await Paystack.initiateTransfer(amount, userBankDetails.dataValues.recipient_code)
+            if (dresponse) return dresponse
+            await transaction.commit()
+        } catch (error) {
+            await transaction.rollbaack()
+            throw new Error('transaction failed')
+        }
+
+    }
+    static async withdrawToBeneficiary(amount, userId,email) {
+        //withdraw from user's wallet to beneficiary's account bank using paystack
+        let transaction
+        try {
+            transaction = await db.sequelize.transaction()
+            const user = await User.findOne({ where: { id:userId } }, { transaction })
+            const bUser = await User.findOne({ where: { email } }, { transaction })
+            const beneficiaryId = bUser.dataValues.id
+             let check
+            if(user && bUser){
+             check  =   await Beneficiary.findAll({where:{beneficiaryId,benefactorId:userId}},{transaction})
+
+            }
+            if (check.length < 1) {
+                return internalResponse(false, "", 404, "user is not a beneficiary")
+              }
+            
+           
+            
+              let  userWallet = await Wallet.findOne({ where: { userId: user.dataValues.id } }, { transaction })
+
+                if (!userWallet) {
+                    return internalResponse(false, "", 404, "user does not have a wallet")
+
+
+
+                }
+                let BUserBankDetails = await BankDetails.findOne({ where: { userId:beneficiaryId } }, { transaction })
+                if (!BUserBankDetails) return internalResponse(false, "", 404, " beneficiary has no bank details")
+            
+            const dresponse = await this.debitWallet(userWallet.dataValues.id, amount)
+
+            const result = await Paystack.initiateTransfer(amount, BUserBankDetails.dataValues.recipient_code)
+            if (dresponse) return dresponse
+            await transaction.commit()
+        } catch (error) {
+            await transaction.rollbaack()
+            throw new Error('transaction failed')
+        }
+
+    }
+
+
+
+
+}
+module.exports = Wallets

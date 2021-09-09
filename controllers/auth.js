@@ -1,30 +1,39 @@
-const { User , Wallet} = require('../models/index')
+const { User } = require('../models/index')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
-const { responseHandler } = require('../utils/responseHandler')
+const { successRes, errorResponse } = require('../utils/responseHandler')
 const Wallets = require('./wallet')
+const db = require('../models/index')
 
 
 class Auth {
     static async register(req, res) {
+        let transaction
 
         try {
+            transaction = await db.sequelize.transaction()
             const { firstName, lastName, email, password } = req.body
-            const user = await User.findOne({ where: { email } })
+            const user = await User.findOne({ where: { email } }, { transaction })
             if (user) {
-               return  responseHandler(res,409,{},"user with that email already exist",true)
-               
+                return errorResponse(res, "user with that email already exist", 409)
+
+
             }
-            const newUser = await User.create({ firstName, lastName, email, password })
-              await Wallets.createWallet(newUser.dataValues.id)
-            return  responseHandler(res,201,{},`welcome ${newUser.firstName}`)
-               
+            const newUser = await User.create({ firstName, lastName, email, password }, { transaction })
+            await Wallets.createWallet(newUser.dataValues.id)
+            await transaction.commit()
+            return successRes(res, {}, `welcome ${newUser.firstName}`, 201)
+
+
+
         } catch (error) {
-            console.log(error)
-            return  responseHandler(res,500,{},"error occourred, contact support",true)
-            
-               
-           
+            await transaction.rollback()
+
+            return errorResponse(res, "error occourred, contact support", 500)
+
+
+
+
         }
 
 
@@ -37,28 +46,31 @@ class Auth {
             const { email, password } = req.body
             const user = await User.findOne({ where: { email } })
             if (user === null) {
-                return  responseHandler(res,404,{},"user with that email does not exist",true)
-               
+                return errorResponse(res, "user with that email does not  exist", 404)
+
+
             }
             const comparedPassword = await bcrypt.compare(password, user.dataValues.password);
-            
+
             if (!comparedPassword) {
-                return  responseHandler(res,401,{},"email and password do not match",true)
-               
+                return errorResponse(res, "email and password do not match", 401)
+
+
             }
             const token = jwt.sign({ id: user.dataValues.id }, process.env.JWTSECRET, { expiresIn: process.env.TOKENVALIDITY })
-          
+
             const userData = {
-                "uuid":user.dataValues.uuid, 
-                "firstName":user.dataValues.firstName,
-                  "email" :user.dataValues.email
+                "uuid": user.dataValues.uuid,
+                "firstName": user.dataValues.firstName,
+                "email": user.dataValues.email
             }
-            return responseHandler(res,200,{token,userData},"")
-           
+            return successRes(res, { token, userData }, "", 200)
+
+
         } catch (error) {
-            console.log(error)
-            return  responseHandler(res,500,{},"error,contact support",true)
-          
+
+            return errorResponse(res, "error occourred, contact support", 500)
+
         }
 
 
@@ -84,8 +96,9 @@ class Auth {
 
 
         } catch (err) {
-            return  responseHandler(res,403,{},"please login",true)
-           
+            return errorResponse(res, "please login", 403)
+
+
         }
 
 
