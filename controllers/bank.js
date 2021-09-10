@@ -8,6 +8,7 @@ const Paystack = require('../utils/paystack');
 class BankController{
     static async addBank(name,account_number,bank_name,userId){
         try{
+          //you can get list of banks using paystack and save them in the database
             const bankDetails = await Bank.findOne({where:{name:bank_name}})
             if(!bankDetails){
                 return internalResponse(false,"",404,"bank not found")

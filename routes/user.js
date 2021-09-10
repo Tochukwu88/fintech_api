@@ -8,13 +8,19 @@ const Paystack = require('../utils/paystack')
 const router = express.Router()
 router.post("/add",Auth.verifyToken, UserController.addBeneficiary )
 router.post("/remove",Auth.verifyToken, UserController.removeBeneficiary )
-router.post("/pay",Auth.verifyToken, PaystackController.initPaystack )
+router.post("/fund",Auth.verifyToken, PaystackController.initPaystack )
+//webhooks route where paystack sends event to
 router.post("/verify",PaystackController.verify)
 router.post("/transfer",Auth.verifyToken,UserController.transfer)
 router.post("/withdraw",Auth.verifyToken,UserController.withdraw)
 router.post("/withdraw/beneficiary",Auth.verifyToken,UserController.withdrawToBeneficiary)
 router.post("/addbank",Auth.verifyToken,UserController.addBank)
-// router.get("/banks",Paystack.listbanks)
+// paystack callback url
+router.get("/cb",(req,res)=>{
+    res.send("account successfully funded")
+})
+//to get list of banks from paystack
+ router.get("/banks",Paystack.listbanks)
 
 
 module.exports = router
