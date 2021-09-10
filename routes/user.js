@@ -13,6 +13,7 @@ router.post("/verify",PaystackController.verify)
 router.post("/transfer",Auth.verifyToken,UserController.transfer)
 router.post("/withdraw",Auth.verifyToken,UserController.withdraw)
 router.post("/withdraw/beneficiary",Auth.verifyToken,UserController.withdrawToBeneficiary)
+router.post("/addbank",Auth.verifyToken,UserController.addBank)
 // router.get("/banks",Paystack.listbanks)
 
 

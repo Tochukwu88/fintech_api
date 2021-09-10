@@ -65,7 +65,7 @@ class Wallets {
 
     }
     static async debitWallet(id, amount, description) {
-        let transaction
+        let transaction 
         try {
             transaction = await db.sequelize.transaction()
             if (amount < 0.00) {
@@ -92,12 +92,13 @@ class Wallets {
 
 
             }, { transaction })
-            await transaction.commit()
+            transaction.commit()
             return internalResponse(true, "", 200, "transaction succesfull")
+            
 
 
         } catch (error) {
-            await transaction.rollbaack()
+            transaction.rollback()
             console.log(error)
             throw new Error('transaction failed')
         }
@@ -168,10 +169,18 @@ class Wallets {
             const dresponse = await this.debitWallet(userWallet.dataValues.id, amount)
 
             const result = await Paystack.initiateTransfer(amount, userBankDetails.dataValues.recipient_code)
+         //at this point you will receive this json response from paystack
+        //   {  status: false,
+        //     message: 'You cannot initiate third party payouts as a starter business'}
+            console.log(result)
+            
+           
             if (dresponse) return dresponse
             await transaction.commit()
+
+           
         } catch (error) {
-            await transaction.rollbaack()
+            await transaction.rollback()
             throw new Error('transaction failed')
         }
 
@@ -181,21 +190,20 @@ class Wallets {
         let transaction
         try {
             transaction = await db.sequelize.transaction()
-            const user = await User.findOne({ where: { id:userId } }, { transaction })
-            const bUser = await User.findOne({ where: { email } }, { transaction })
+            const user = await User.findOne({ where: { id:userId } })
+            const bUser = await User.findOne({ where: { email } })
+            if(!bUser)return  internalResponse(false, "", 404, "  beneficiary with that email does not exist")
             const beneficiaryId = bUser.dataValues.id
-             let check
-            if(user && bUser){
-             check  =   await Beneficiary.findAll({where:{beneficiaryId,benefactorId:userId}},{transaction})
-
-            }
+            const benefactorId = user.dataValues.id
+             let check =   await Beneficiary.findOne({where:{beneficiaryId,benefactorId}})
+           
             if (check.length < 1) {
                 return internalResponse(false, "", 404, "user is not a beneficiary")
               }
             
            
             
-              let  userWallet = await Wallet.findOne({ where: { userId: user.dataValues.id } }, { transaction })
+              let  userWallet = await Wallet.findOne({ where: { userId: user.dataValues.id } })
 
                 if (!userWallet) {
                     return internalResponse(false, "", 404, "user does not have a wallet")
@@ -203,7 +211,7 @@ class Wallets {
 
 
                 }
-                let BUserBankDetails = await BankDetails.findOne({ where: { userId:beneficiaryId } }, { transaction })
+                let BUserBankDetails = await BankDetails.findOne({ where: { userId:beneficiaryId } })
                 if (!BUserBankDetails) return internalResponse(false, "", 404, " beneficiary has no bank details")
             
             const dresponse = await this.debitWallet(userWallet.dataValues.id, amount)
@@ -212,7 +220,8 @@ class Wallets {
             if (dresponse) return dresponse
             await transaction.commit()
         } catch (error) {
-            await transaction.rollbaack()
+            console.log(error)
+            await transaction.rollback()
             throw new Error('transaction failed')
         }
 

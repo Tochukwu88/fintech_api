@@ -100,7 +100,7 @@ class UserController {
     }
   }
   static async addBank(req,res){
-    const authId = req.body.id
+    const authId = req.user.id
     const{name,account_number,bank_name} = req.body
       const response = await BankController.addBank(name,account_number,bank_name,authId)
       if(!response.status){

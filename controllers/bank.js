@@ -23,8 +23,9 @@ class BankController{
         }
         await BankDetails.create({name,account_number,bank_name,bank_code:bankCode,recipient_code:recipientCode,userId})
         return internalResponse(true,"",201,"bank added succefully")
-
+        
         }catch(err){
+          console.log(err)
             throw new Error("unable to add bank")
         }
 

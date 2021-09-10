@@ -155,6 +155,7 @@ class Paystack{
                 })
     
             })
+           
             return await response.json()
     
     
