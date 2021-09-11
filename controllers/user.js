@@ -34,11 +34,11 @@ class UserController {
       return errorResponse(res, "error occourred, contact support", 500)
     }
   }
-  static async withdraw (req,res){
+  static async withdraw(req, res) {
     try {
       const authId = req.user.id
-      const {  amount } = req.body
-      const response = await Wallets.withdraw(  parseInt(amount),authId)
+      const { amount } = req.body
+      const response = await Wallets.withdraw(parseInt(amount), authId)
       if (!response.status) {
         return errorResponse(res, response.message, response.statusCode)
       }
@@ -50,11 +50,11 @@ class UserController {
     }
 
   }
-  static async withdrawToBeneficiary (req,res){
+  static async withdrawToBeneficiary(req, res) {
     try {
       const authId = req.user.id
-      const {  amount,email } = req.body
-      const response = await Wallets.withdrawToBeneficiary(  parseInt(amount),authId,email)
+      const { amount, email } = req.body
+      const response = await Wallets.withdrawToBeneficiary(parseInt(amount), authId, email)
       if (!response.status) {
         return errorResponse(res, response.message, response.statusCode)
       }
@@ -99,15 +99,15 @@ class UserController {
       return errorResponse(res, "error occourred, contact support", 500)
     }
   }
-  static async addBank(req,res){
+  static async addBank(req, res) {
     const authId = req.user.id
-    const{name,account_number,bank_name} = req.body
-      const response = await BankController.addBank(name,account_number,bank_name,authId)
-      if(!response.status){
-        return errorResponse(res, response.message, response.statusCode)
+    const { name, account_number, bank_name } = req.body
+    const response = await BankController.addBank(name, account_number, bank_name, authId)
+    if (!response.status) {
+      return errorResponse(res, response.message, response.statusCode)
 
-      }
-      return successRes(res, {}, response.message, response.statusCode)
+    }
+    return successRes(res, {}, response.message, response.statusCode)
 
   }
 }

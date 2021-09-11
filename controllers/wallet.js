@@ -1,6 +1,6 @@
 
 const db = require('../models/index');
-const { User, Wallet, Transaction, BankDetails,Beneficiary } = require('../models/index');
+const { User, Wallet, Transaction, BankDetails, Beneficiary } = require('../models/index');
 const Paystack = require('../utils/paystack');
 const { internalResponse } = require('../utils/responseHandler');
 
@@ -65,7 +65,7 @@ class Wallets {
 
     }
     static async debitWallet(id, amount, description) {
-        let transaction 
+        let transaction
         try {
             transaction = await db.sequelize.transaction()
             if (amount < 0.00) {
@@ -94,7 +94,7 @@ class Wallets {
             }, { transaction })
             transaction.commit()
             return internalResponse(true, "", 200, "transaction succesfull")
-            
+
 
 
         } catch (error) {
@@ -169,51 +169,51 @@ class Wallets {
             const dresponse = await this.debitWallet(userWallet.dataValues.id, amount)
 
             const result = await Paystack.initiateTransfer(amount, userBankDetails.dataValues.recipient_code)
-         //at this point you will receive this json response from paystack
-        //   {  status: false,
-        //     message: 'You cannot initiate third party payouts as a starter business'}
+            //at this point you will receive this json response from paystack
+            //   {  status: false,
+            //     message: 'You cannot initiate third party payouts as a starter business'}
             console.log(result)
-            
-           
+
+
             if (dresponse) return dresponse
             await transaction.commit()
 
-           
+
         } catch (error) {
             await transaction.rollback()
             throw new Error('transaction failed')
         }
 
     }
-    static async withdrawToBeneficiary(amount, userId,email) {
+    static async withdrawToBeneficiary(amount, userId, email) {
         //withdraw from user's wallet to beneficiary's account bank using paystack
         let transaction
         try {
             transaction = await db.sequelize.transaction()
-            const user = await User.findOne({ where: { id:userId } })
+            const user = await User.findOne({ where: { id: userId } })
             const bUser = await User.findOne({ where: { email } })
-            if(!bUser)return  internalResponse(false, "", 404, "  beneficiary with that email does not exist")
+            if (!bUser) return internalResponse(false, "", 404, "  beneficiary with that email does not exist")
             const beneficiaryId = bUser.dataValues.id
             const benefactorId = user.dataValues.id
-             let check =   await Beneficiary.findOne({where:{beneficiaryId,benefactorId}})
-           
+            let check = await Beneficiary.findOne({ where: { beneficiaryId, benefactorId } })
+
             if (check.length < 1) {
                 return internalResponse(false, "", 404, "user is not a beneficiary")
-              }
-            
-           
-            
-              let  userWallet = await Wallet.findOne({ where: { userId: user.dataValues.id } })
-
-                if (!userWallet) {
-                    return internalResponse(false, "", 404, "user does not have a wallet")
+            }
 
 
 
-                }
-                let BUserBankDetails = await BankDetails.findOne({ where: { userId:beneficiaryId } })
-                if (!BUserBankDetails) return internalResponse(false, "", 404, " beneficiary has no bank details")
-            
+            let userWallet = await Wallet.findOne({ where: { userId: user.dataValues.id } })
+
+            if (!userWallet) {
+                return internalResponse(false, "", 404, "user does not have a wallet")
+
+
+
+            }
+            let BUserBankDetails = await BankDetails.findOne({ where: { userId: beneficiaryId } })
+            if (!BUserBankDetails) return internalResponse(false, "", 404, " beneficiary has no bank details")
+
             const dresponse = await this.debitWallet(userWallet.dataValues.id, amount)
 
             const result = await Paystack.initiateTransfer(amount, BUserBankDetails.dataValues.recipient_code)
