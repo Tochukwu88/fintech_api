@@ -172,7 +172,7 @@ class Wallets {
             //at this point you will receive this json response from paystack
             //   {  status: false,
             //     message: 'You cannot initiate third party payouts as a starter business'}
-            console.log(result)
+            // console.log(result)--->> uncomment this to see the response from paystack
 
 
             if (dresponse) return dresponse
@@ -186,7 +186,7 @@ class Wallets {
 
     }
     static async withdrawToBeneficiary(amount, userId, email) {
-        //withdraw from user's wallet to beneficiary's account bank using paystack
+        //withdraw from user's wallet to beneficiary's account  using paystack
         let transaction
         try {
             transaction = await db.sequelize.transaction()
